@@ -15,9 +15,6 @@
  */
 'use strict';
 
-/**
- * Initializes the FriendlyEats app.
- */
 function FriendlyEats() { // eslint-disable-line no-redeclare
   this.filters = {
     city: '',
@@ -27,12 +24,17 @@ function FriendlyEats() { // eslint-disable-line no-redeclare
   };
 
   this.dialogs = {};
-
+  this.userFavorites = [];
+  this.fromFavorites = false;
   var that = this;
 
-  firebase.firestore().enablePersistence()
-    .then(function() {
+  //firebase.firestore().enablePersistence()
+  Promise.resolve()  
+  .then(function() {
       return firebase.auth().signInAnonymously();
+    })
+    .then(function(){
+      return that.updateUserInfo();
     })
     .then(function() {
       that.initTemplates();
@@ -60,6 +62,11 @@ FriendlyEats.prototype.initRouter = function() {
     .on({
       '/setup': function() {
         that.viewSetup();
+      }
+    })
+    .on({
+      './favorites': function(){
+        that.viewFavorites();
       }
     })
     .on({

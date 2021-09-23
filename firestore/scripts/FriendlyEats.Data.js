@@ -91,3 +91,46 @@ FriendlyEats.prototype.addRating = function (restaurantID, rating) {
     });
   });
 };
+
+
+FriendlyEats.prototype.updateUserInfo = function() {
+  const currentUser = firebase.auth().currentUser;
+  console.log('U R '+currentUser.uid);
+  const uid = currentUser.uid;
+  const userData = {lastLoginTime: new Date()};
+  const updatePromise = firebase.firestore().doc(`/users/${uid}`).set(userData, {merge: true});
+  const getPromise = firebase.firestore().doc(`/users/${uid}`).onSnapshot((doc) => {
+    const userData = doc.data();
+    if(userData.favorites){
+      this.userFavorites = userData.favorites;
+    }
+  });
+  return Promise.all([updatePromise, getPromise])
+};
+
+FriendlyEats.prototype.getFavorites = function(render) {
+  const uid = firebase.auth().currentUser.uid;
+  const getFavoritesFunction = firebase.functions().httpsCallable('getFavorites_v0');
+  getFavoritesFunction({uid: uid}).then(function(result){
+    console.log(result);
+    result.data.forEach(restaurant => {
+      render(restaurant);
+    })
+  });
+}
+
+FriendlyEats.prototype.addToFavorites = function(restaurantId){
+  const currUserId = firebase.auth().currentUser.uid;
+  const userDoc = firebase.firestore().collection('users').doc(currUserId);
+  userDoc.update({
+    favorites:firebase.firestore.FieldValue.arrayUnion(restaurantId)
+  })
+}
+
+FriendlyEats.prototype.removeFromFavorites = function(restaurantId){
+  const currUserId = firebase.auth().currentUser.uid;
+  const userDoc = firebase.firestore().collection('users').doc(currUserId);
+  userDoc.update({
+    favorites:firebase.firestore.FieldValue.arrayRemove(restaurantId)
+  })
+}

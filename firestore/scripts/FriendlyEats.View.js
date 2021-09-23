@@ -30,15 +30,56 @@ FriendlyEats.prototype.viewHome = function() {
   this.getAllRestaurants();
 };
 
-FriendlyEats.prototype.viewList = function(filters, filter_description) {
+FriendlyEats.prototype.viewFavorites = function() {
+  this.viewList(null, null, true);
+}
+
+
+FriendlyEats.prototype.renderRestaurantCard = function(mainEl, data, docId){
+
+  var that = this
+  data['go_to_restaurant'] = function() {
+    that.router.navigate('/restaurants/' + docId);
+  };
+
+  // check if restaurant card has already been rendered
+  var existingRestaurantCardEl = mainEl.querySelector('#' + this.ID_CONSTANT + docId);
+  var el = existingRestaurantCardEl || this.renderTemplate('restaurant-card', data);
+
+  var ratingEl = el.querySelector('.rating');
+  var priceEl = el.querySelector('.price');
+
+  // clear out existing rating and price if they already exist
+  if (existingRestaurantCardEl) {
+    ratingEl.innerHTML = '';
+    priceEl.innerHTML = '';
+  }
+
+  ratingEl.append(this.renderRating(data.avgRating));
+  priceEl.append(this.renderPrice(data.price));
+
+  if (!existingRestaurantCardEl) {
+    mainEl.querySelector('#cards').append(el);
+  }
+}
+
+FriendlyEats.prototype.viewList = function(filters, filter_description, favorites = false) {
+  if(favorites){
+    filter_description = 'Your favorites';
+  }
+
   if (!filter_description) {
     filter_description = 'any type of food with any price in any city.';
   }
+  this.fromFavorites = favorites;
 
   var mainEl = this.renderTemplate('main-adjusted');
   var headerEl = this.renderTemplate('header-base', {
-    hasSectionHeader: true
+    hasSectionHeader: true,
+    favorites: favorites
   });
+
+  var that = this;
 
   this.replaceElement(
     headerEl.querySelector('#section-header'),
@@ -49,14 +90,13 @@ FriendlyEats.prototype.viewList = function(filters, filter_description) {
 
   this.replaceElement(document.querySelector('.header'), headerEl);
   this.replaceElement(document.querySelector('main'), mainEl);
-
-  var that = this;
+  
   headerEl.querySelector('#show-filters').addEventListener('click', function() {
     that.dialogs.filter.show();
   });
 
-  var renderResults = function(doc) {
-    if (!doc) {
+  var renderResults = function(restaurant) {
+    if (!restaurant) {
       var headerEl = that.renderTemplate('header-base', {
         hasSectionHeader: true
       });
@@ -78,34 +118,22 @@ FriendlyEats.prototype.viewList = function(filters, filter_description) {
       that.replaceElement(document.querySelector('main'), noResultsEl);
       return;
     }
-    var data = doc.data();
-    data['.id'] = doc.id;
-    data['go_to_restaurant'] = function() {
-      that.router.navigate('/restaurants/' + doc.id);
-    };
-
-    // check if restaurant card has already been rendered
-    var existingRestaurantCardEl = mainEl.querySelector('#' + that.ID_CONSTANT + doc.id);
-    var el = existingRestaurantCardEl || that.renderTemplate('restaurant-card', data);
-
-    var ratingEl = el.querySelector('.rating');
-    var priceEl = el.querySelector('.price');
-
-    // clear out existing rating and price if they already exist
-    if (existingRestaurantCardEl) {
-      ratingEl.innerHTML = '';
-      priceEl.innerHTML = '';
+    var restData;
+    var restId;
+    if(favorites){
+      restData = restaurant;
+      restId = restaurant['.id']
+    } else {
+      restData = restaurant.data();
+      restId = restaurant.id;
     }
-
-    ratingEl.append(that.renderRating(data.avgRating));
-    priceEl.append(that.renderPrice(data.price));
-
-    if (!existingRestaurantCardEl) {
-      mainEl.querySelector('#cards').append(el);
-    }
+    
+    that.renderRestaurantCard(mainEl, restData, restId);
   };
 
-  if (filters.city || filters.category || filters.price || filters.sort !== 'Rating' ) {
+  if (favorites){
+    this.getFavorites(renderResults);
+  } else if (filters.city || filters.category || filters.price || filters.sort !== 'Rating' ) {
     this.getFilteredRestaurants({
       city: filters.city || 'Any',
       category: filters.category || 'Any',
@@ -317,7 +345,26 @@ FriendlyEats.prototype.viewRestaurant = function(id) {
       data.show_add_review = function() {
         dialog.show();
       };
+      
+      data.add_to_favorites = function(){
+        that.addToFavorites(id);
+        that.rerender();
+      };
 
+      data.remove_from_favorites = function(){
+        that.removeFromFavorites(id);
+        that.rerender();
+      };
+
+      if(that.fromFavorites){
+        data.closeLink = '/favorits';
+      }else {
+        data.closeLink = '/'
+      }
+
+      data.isFavorite = (that.userFavorites.indexOf(id) >= 0);
+
+      data.isFavorite = (that.userFavorites.indexOf(id) >= 0);
       sectionHeaderEl = that.renderTemplate('restaurant-header', data);
       sectionHeaderEl
         .querySelector('.rating')
